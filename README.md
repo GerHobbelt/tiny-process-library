@@ -1,5 +1,3 @@
-**_This project has moved to https://gitlab.com/eidheim/tiny-process-library._**
-
 # tiny-process-library
 A small platform independent library making it simple to create and stop new processes in C++, as well as writing to stdin and reading from stdout and stderr of a new process.
 
