@@ -12,6 +12,14 @@
 #endif
 
 namespace TinyProcessLib {
+/// Additional parameters to Process constructors.
+struct Config {
+  /// Buffer size for reading stdout and stderr. Default is 131072 (128 kB).
+  std::size_t buffer_size = 131072;
+  /// Set to true to inherit file descriptors from parent process. Default is false.
+  /// On Windows: has no effect unless read_stdout==nullptr, read_stderr==nullptr and open_stdin==false.
+  bool inherit_file_descriptors = false;
+};
 
 /// Platform independent class for creating processes.
 /// Note on Windows: it seems not possible to specify which pipes to redirect.
@@ -41,6 +49,8 @@ private:
     id_type id;
 #ifdef _WIN32
     void *handle;
+#else
+    int exit_status{-1};
 #endif
   };
 
@@ -50,13 +60,13 @@ public:
           std::function<void(const char *bytes, size_t n)> read_stdout = nullptr,
           std::function<void(const char *bytes, size_t n)> read_stderr = nullptr,
           bool open_stdin = false,
-          size_t buffer_size = 131072) noexcept;
+          const Config &config = {}) noexcept;
   /// Starts a process with the environment of the calling process.
   Process(const string_type &command, const string_type &path = string_type(),
           std::function<void(const char *bytes, size_t n)> read_stdout = nullptr,
           std::function<void(const char *bytes, size_t n)> read_stderr = nullptr,
           bool open_stdin = false,
-          size_t buffer_size = 131072) noexcept;
+          const Config &config = {}) noexcept;
 
   /// Starts a process with specified environment.
   Process(const std::vector<string_type> &arguments,
@@ -65,7 +75,7 @@ public:
           std::function<void(const char *bytes, size_t n)> read_stdout = nullptr,
           std::function<void(const char *bytes, size_t n)> read_stderr = nullptr,
           bool open_stdin = false,
-          size_t buffer_size = 131072) noexcept;
+          const Config &config = {}) noexcept;
   /// Starts a process with specified environment.
   Process(const string_type &command,
           const string_type &path,
@@ -73,7 +83,7 @@ public:
           std::function<void(const char *bytes, size_t n)> read_stdout = nullptr,
           std::function<void(const char *bytes, size_t n)> read_stderr = nullptr,
           bool open_stdin = false,
-          size_t buffer_size = 131072) noexcept; /// Starts a process with specified environment.
+          const Config &config = {}) noexcept; /// Starts a process with specified environment.
 #ifndef _WIN32
   /// Starts a process with the environment of the calling process.
   /// Supported on Unix-like systems only.
@@ -81,7 +91,7 @@ public:
           std::function<void(const char *bytes, size_t n)> read_stdout = nullptr,
           std::function<void(const char *bytes, size_t n)> read_stderr = nullptr,
           bool open_stdin = false,
-          size_t buffer_size = 131072) noexcept;
+          const Config &config = {}) noexcept;
 #endif
   ~Process() noexcept;
 
@@ -109,10 +119,15 @@ private:
   std::mutex close_mutex;
   std::function<void(const char *bytes, size_t n)> read_stdout;
   std::function<void(const char *bytes, size_t n)> read_stderr;
+#ifndef _WIN32
+  std::thread stdout_stderr_thread;
+#else
   std::thread stdout_thread, stderr_thread;
+#endif
   bool open_stdin;
   std::mutex stdin_mutex;
-  size_t buffer_size;
+
+  Config config;
 
   std::unique_ptr<fd_type> stdout_fd, stderr_fd, stdin_fd;
 

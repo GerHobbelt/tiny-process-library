@@ -39,7 +39,11 @@ std::mutex create_process_mutex;
 Process::id_type Process::open(const std::vector<string_type> &arguments, const string_type &path, const environment_type *environment) noexcept {
   string_type command;
   for(auto &argument : arguments)
+#ifdef UNICODE
+    command += (command.empty() ? L"" : L" ") + argument;
+#else
     command += (command.empty() ? "" : " ") + argument;
+#endif
   return open(command, path, environment);
 }
 
@@ -125,8 +129,9 @@ Process::id_type Process::open(const string_type &command, const string_type &pa
     environment_str += '\0';
 #endif
   }
-  BOOL bSuccess = CreateProcess(nullptr, process_command.empty() ? nullptr : &process_command[0], nullptr, nullptr, FALSE, 0,
-                                environment_str.empty() ? nullptr : &environment_str[0], path.empty() ? nullptr : path.c_str(), &startup_info, &process_info);
+  BOOL bSuccess = CreateProcess(nullptr, process_command.empty() ? nullptr : &process_command[0], nullptr, nullptr,
+                                stdin_fd || stdout_fd || stderr_fd || config.inherit_file_descriptors,
+                                CREATE_NO_WINDOW, environment_str.empty() ? nullptr : &environment_str[0], path.empty() ? nullptr : path.c_str(), &startup_info, &process_info);
 
   if(!bSuccess)
     return 0;
@@ -153,9 +158,9 @@ void Process::async_read() noexcept {
   if(stdout_fd) {
     stdout_thread = std::thread([this]() {
       DWORD n;
-      std::unique_ptr<char[]> buffer(new char[buffer_size]);
+      std::unique_ptr<char[]> buffer(new char[config.buffer_size]);
       for(;;) {
-        BOOL bSuccess = ReadFile(*stdout_fd, static_cast<CHAR *>(buffer.get()), static_cast<DWORD>(buffer_size), &n, nullptr);
+        BOOL bSuccess = ReadFile(*stdout_fd, static_cast<CHAR *>(buffer.get()), static_cast<DWORD>(config.buffer_size), &n, nullptr);
         if(!bSuccess || n == 0)
           break;
         read_stdout(buffer.get(), static_cast<size_t>(n));
@@ -165,9 +170,9 @@ void Process::async_read() noexcept {
   if(stderr_fd) {
     stderr_thread = std::thread([this]() {
       DWORD n;
-      std::unique_ptr<char[]> buffer(new char[buffer_size]);
+      std::unique_ptr<char[]> buffer(new char[config.buffer_size]);
       for(;;) {
-        BOOL bSuccess = ReadFile(*stderr_fd, static_cast<CHAR *>(buffer.get()), static_cast<DWORD>(buffer_size), &n, nullptr);
+        BOOL bSuccess = ReadFile(*stderr_fd, static_cast<CHAR *>(buffer.get()), static_cast<DWORD>(config.buffer_size), &n, nullptr);
         if(!bSuccess || n == 0)
           break;
         read_stderr(buffer.get(), static_cast<size_t>(n));
