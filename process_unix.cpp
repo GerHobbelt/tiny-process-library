@@ -1,4 +1,5 @@
 #include "process.hpp"
+#ifndef _WIN32
 #include <algorithm>
 #include <bitset>
 #include <cstdlib>
@@ -374,3 +375,5 @@ void Process::signal(int signum) noexcept {
 }
 
 } // namespace TinyProcessLib
+
+#endif

@@ -70,8 +70,12 @@ private:
     id_type id;
 #ifdef _WIN32
     void *handle{nullptr};
+	uint32_t error_code{ 0 }; // uint32_t === DWORD type, as produced by `GetLastError()` Win32 API.
+#else
+	int error_code{ 0 };      // type produced by `errno` et al.
 #endif
-    int exit_status{-1};
+	string_type error_message;
+	int exit_status{-1};
   };
 
 public:
@@ -121,6 +125,11 @@ public:
   int get_exit_status() noexcept;
   /// If process is finished, returns true and sets the exit status. Returns false otherwise.
   bool try_get_exit_status(int &exit_status) noexcept;
+  /// Returns the system error code, which might provide additional diagnostic information
+  /// when the process failed to start or run.
+  int get_error_code() noexcept;
+  /// Returns the system error message that goes with / represents `get_error_code()`
+  string_type get_error_message() noexcept;
   /// Write to stdin.
   bool write(const char *bytes, size_t n);
   /// Write to stdin. Convenience function using write(const char *, size_t).

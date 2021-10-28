@@ -1,4 +1,5 @@
 #include "process.hpp"
+#ifdef _WIN32
 // clang-format off
 #include <windows.h>
 // clang-format on
@@ -71,19 +72,23 @@ Process::id_type Process::open(const string_type &command, const string_type &pa
 
   std::lock_guard<std::mutex> lock(create_process_mutex);
   if(stdin_fd) {
-    if(!CreatePipe(&stdin_rd_p, &stdin_wr_p, &security_attributes, 0) ||
-       !SetHandleInformation(stdin_wr_p, HANDLE_FLAG_INHERIT, 0))
+    if (!CreatePipe(&stdin_rd_p, &stdin_wr_p, &security_attributes, 0) ||
+	    !SetHandleInformation(stdin_wr_p, HANDLE_FLAG_INHERIT, 0)) {
+      data.error_code = GetLastError();
       return 0;
+	}
   }
   if(stdout_fd) {
     if(!CreatePipe(&stdout_rd_p, &stdout_wr_p, &security_attributes, 0) ||
        !SetHandleInformation(stdout_rd_p, HANDLE_FLAG_INHERIT, 0)) {
+      data.error_code = GetLastError();
       return 0;
     }
   }
   if(stderr_fd) {
     if(!CreatePipe(&stderr_rd_p, &stderr_wr_p, &security_attributes, 0) ||
        !SetHandleInformation(stderr_rd_p, HANDLE_FLAG_INHERIT, 0)) {
+      data.error_code = GetLastError();
       return 0;
     }
   }
@@ -141,10 +146,11 @@ Process::id_type Process::open(const string_type &command, const string_type &pa
                                 path.empty() ? nullptr : path.c_str(),
                                 &startup_info, &process_info);
 
-  if(!bSuccess)
-    return 0;
-  else
-    CloseHandle(process_info.hThread);
+  data.error_code = static_cast<int>(GetLastError());
+  if (!bSuccess)
+	return 0;
+  else 
+	CloseHandle(process_info.hThread);
 
   if(stdin_fd)
     *stdin_fd = stdin_wr_p.detach();
@@ -169,8 +175,9 @@ void Process::async_read() noexcept {
       std::unique_ptr<char[]> buffer(new char[config.buffer_size]);
       for(;;) {
         BOOL bSuccess = ReadFile(*stdout_fd, static_cast<CHAR *>(buffer.get()), static_cast<DWORD>(config.buffer_size), &n, nullptr);
-        if(!bSuccess || n == 0)
-          break;
+        if(!bSuccess || n == 0) {
+		  break;
+		}
         read_stdout(buffer.get(), static_cast<size_t>(n));
       }
     });
@@ -190,8 +197,9 @@ void Process::async_read() noexcept {
 }
 
 int Process::get_exit_status() noexcept {
-  if(data.id == 0)
+  if(data.id == 0) {
     return -1;
+  }
 
   if(!data.handle)
     return data.exit_status;
@@ -199,9 +207,10 @@ int Process::get_exit_status() noexcept {
   WaitForSingleObject(data.handle, INFINITE);
 
   DWORD exit_status;
-  if(!GetExitCodeProcess(data.handle, &exit_status))
+  if(!GetExitCodeProcess(data.handle, &exit_status)) {
+	data.error_code = static_cast<int>(GetLastError());
     data.exit_status = -1; // Store exit status for future calls
-  else
+  } else
     data.exit_status = static_cast<int>(exit_status); // Store exit status for future calls
 
   {
@@ -229,9 +238,10 @@ bool Process::try_get_exit_status(int &exit_status) noexcept {
     return false;
 
   DWORD exit_status_tmp;
-  if(!GetExitCodeProcess(data.handle, &exit_status_tmp))
+  if(!GetExitCodeProcess(data.handle, &exit_status_tmp)) {
+	data.error_code = static_cast<int>(GetLastError());
     exit_status = -1;
-  else
+  } else
     exit_status = static_cast<int>(exit_status_tmp);
   data.exit_status = exit_status; // Store exit status for future calls
 
@@ -348,3 +358,5 @@ void Process::kill(id_type id, bool /*force*/) noexcept {
 }
 
 } // namespace TinyProcessLib
+
+#endif
