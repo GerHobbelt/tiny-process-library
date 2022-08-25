@@ -3,9 +3,9 @@
 // clang-format off
 #include <windows.h>
 // clang-format on
-#include <tlhelp32.h>
 #include <cstring>
 #include <stdexcept>
+#include <tlhelp32.h>
 
 namespace TinyProcessLib {
 
@@ -34,7 +34,7 @@ private:
   HANDLE handle;
 };
 
-//Based on the discussion thread: https://www.reddit.com/r/cpp/comments/3vpjqg/a_new_platform_independent_process_library_for_c11/cxq1wsj
+// Based on the discussion thread: https://www.reddit.com/r/cpp/comments/3vpjqg/a_new_platform_independent_process_library_for_c11/cxq1wsj
 std::mutex create_process_mutex;
 
 Process::id_type Process::open(const std::vector<string_type> &arguments, const string_type &path, const environment_type *environment) noexcept {
@@ -48,7 +48,7 @@ Process::id_type Process::open(const std::vector<string_type> &arguments, const 
   return open(command, path, environment);
 }
 
-//Based on the example at https://msdn.microsoft.com/en-us/library/windows/desktop/ms682499(v=vs.85).aspx.
+// Based on the example at https://msdn.microsoft.com/en-us/library/windows/desktop/ms682499(v=vs.85).aspx.
 Process::id_type Process::open(const string_type &command, const string_type &path, const environment_type *environment) noexcept {
   if(open_stdin)
     stdin_fd = std::unique_ptr<fd_type>(new fd_type(nullptr));
@@ -127,18 +127,20 @@ Process::id_type Process::open(const string_type &command, const string_type &pa
   process_command += "\"";
 #endif
 
-  DWORD creation_flags = stdin_fd || stdout_fd || stderr_fd ? CREATE_NO_WINDOW : 0;  // CREATE_NO_WINDOW cannot be used when stdout or stderr is redirected to parent process
+  DWORD creation_flags = stdin_fd || stdout_fd || stderr_fd ? CREATE_NO_WINDOW : 0; // CREATE_NO_WINDOW cannot be used when stdout or stderr is redirected to parent process
   string_type environment_str;
   if(environment) {
 #ifdef UNICODE
     for(const auto &e : *environment)
       environment_str += e.first + L'=' + e.second + L'\0';
-    environment_str += L'\0';
+    if(!environment_str.empty())
+      environment_str += L'\0';
     creation_flags |= CREATE_UNICODE_ENVIRONMENT;
 #else
     for(const auto &e : *environment)
       environment_str += e.first + '=' + e.second + '\0';
-    environment_str += '\0';
+    if(!environment_str.empty())
+      environment_str += '\0';
 #endif
   }
   BOOL bSuccess = CreateProcess(nullptr, process_command.empty() ? nullptr : &process_command[0], nullptr, nullptr,
@@ -305,7 +307,7 @@ void Process::close_stdin() noexcept {
   }
 }
 
-//Based on http://stackoverflow.com/a/1173396
+// Based on http://stackoverflow.com/a/1173396
 void Process::kill(bool /*force*/) noexcept {
   std::lock_guard<std::mutex> lock(close_mutex);
   if(data.id > 0 && !closed) {
@@ -331,7 +333,7 @@ void Process::kill(bool /*force*/) noexcept {
   }
 }
 
-//Based on http://stackoverflow.com/a/1173396
+// Based on http://stackoverflow.com/a/1173396
 void Process::kill(id_type id, bool /*force*/) noexcept {
   if(id == 0)
     return;
