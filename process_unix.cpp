@@ -249,11 +249,27 @@ void Process::async_read() noexcept {
                 read_stderr(buffer.get(), static_cast<size_t>(n));
             }
             else if(n < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+              if(fd_is_stdout[i]) {
+                if(config.on_stdout_close)
+                  config.on_stdout_close();
+              }
+              else {
+                if(config.on_stderr_close)
+                  config.on_stderr_close();
+              }
               pollfds[i].fd = -1;
               continue;
             }
           }
           if(pollfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            if(fd_is_stdout[i]) {
+              if(config.on_stdout_close)
+                config.on_stdout_close();
+            }
+            else {
+              if(config.on_stderr_close)
+                config.on_stderr_close();
+            }
             pollfds[i].fd = -1;
             continue;
           }
@@ -348,7 +364,7 @@ bool Process::write(const char *bytes, size_t n) {
 
   std::lock_guard<std::mutex> lock(stdin_mutex);
   if(stdin_fd) {
-    while (n != 0) {
+    while(n != 0) {
       const ssize_t ret = ::write(*stdin_fd, bytes, n);
       if(ret < 0) {
         if(errno == EINTR)
@@ -356,8 +372,8 @@ bool Process::write(const char *bytes, size_t n) {
         else
           return false;
       }
-      bytes += (size_t)ret;
-      n -= (size_t)ret;
+      bytes += static_cast<size_t>(ret);
+      n -= static_cast<size_t>(ret);
     }
     return true;
   }
