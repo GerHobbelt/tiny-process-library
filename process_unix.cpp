@@ -353,7 +353,7 @@ void Process::async_read() noexcept {
               continue;
             }
           }
-          if(pollfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+          else if(pollfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
             if(fd_is_stdout[i]) {
               if(config.on_stdout_close)
                 config.on_stdout_close();
